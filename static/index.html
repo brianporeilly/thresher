@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Sift — CSV triage tool</title>
+<script src="/papaparse.min.js"></script>
+<style>
+  :root{
+    --bg:#F1F2ED;
+    --surface:#FFFFFF;
+    --ink:#1D211F;
+    --ink-muted:#5B6058;
+    --border:#D7D9D0;
+    --accent:#3A4F7A;
+    --accent-ink:#FFFFFF;
+    --keep:#3F6B4A;
+    --keep-bg:#E7F0E7;
+    --keep-border:#BFD5C2;
+    --drop:#8C3B34;
+    --drop-bg:#F5E7E4;
+    --drop-border:#E0C4BE;
+    --focus:#3A4F7A;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:15px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{
+    font-family:Georgia,"Iowan Old Style","Times New Roman",serif;
+    font-weight:600;
+    margin:0;
+  }
+  button{font-family:inherit;}
+  a{color:var(--accent);}
+  ::selection{background:#c9d3e6;}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px;}
+
+  /* ---------- layout shells ---------- */
+  .app{min-height:100vh;display:flex;flex-direction:column;}
+  .hidden{display:none !important;}
+
+  /* ---------- landing / upload ---------- */
+  .landing{
+    flex:1;display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  .landing-card{
+    max-width:520px;width:100%;background:var(--surface);border:1px solid var(--border);
+    border-radius:16px;padding:40px 36px;text-align:center;
+  }
+  .landing-card h1{font-size:28px;margin-bottom:8px;}
+  .landing-card p.tag{color:var(--ink-muted);margin:0 0 28px;font-size:15px;}
+  .dropzone{
+    display:flex;flex-direction:column;align-items:center;
+    border:1.5px dashed var(--border);border-radius:var(--radius);padding:32px 20px;
+    cursor:pointer;transition:border-color .15s, background .15s;
+  }
+  .dropzone:hover, .dropzone.drag{border-color:var(--accent);background:#F5F7FA;}
+  .dropzone .icon{font-size:28px;margin-bottom:10px;}
+  .dropzone .main{font-weight:600;max-width:32ch;}
+  .dropzone .sub{color:var(--ink-muted);font-size:13px;margin-top:4px;max-width:34ch;}
+  input[type=file]{display:none;}
+  .landing-note{margin-top:18px;color:var(--ink-muted);font-size:13px;}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:9px 16px;border-radius:8px;border:1px solid var(--border);
+    background:var(--surface);color:var(--ink);font-size:14px;font-weight:500;
+    cursor:pointer;white-space:nowrap;
+  }
+  .btn:hover{border-color:#BFC3B7;}
+  .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+  .btn.primary:hover{opacity:.92;}
+  .btn.ghost{border-color:transparent;background:transparent;}
+  .btn.ghost:hover{background:#E9EAE4;}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
+
+  /* ---------- config screen ---------- */
+  .config{flex:1;padding:28px 20px 80px;max-width:820px;margin:0 auto;width:100%;}
+  .config-head{margin-bottom:22px;}
+  .config-head h2{font-size:22px;margin-bottom:6px;}
+  .config-head p{color:var(--ink-muted);margin:0;font-size:14px;}
+  .col-row{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:14px 16px;margin-bottom:10px;
+  }
+  .col-row-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .col-name{font-weight:600;}
+  .col-sample{color:var(--ink-muted);font-size:12.5px;margin-top:2px;}
+  .seg-select{
+    display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;
+  }
+  .seg-select button{
+    border:none;background:var(--surface);padding:7px 13px;font-size:13px;cursor:pointer;color:var(--ink-muted);
+  }
+  .seg-select button.active{background:var(--accent);color:var(--accent-ink);}
+  .seg-select button+button{border-left:1px solid var(--border);}
+  .col-options{margin-top:10px;display:flex;align-items:center;gap:8px;}
+  .col-options input[type=text]{
+    flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:7px;font-size:13.5px;
+  }
+  .col-options label{font-size:12.5px;color:var(--ink-muted);white-space:nowrap;}
+  .config-actions{position:sticky;bottom:0;background:linear-gradient(to top, var(--bg) 60%, transparent);
+    padding:20px 0 4px;display:flex;justify-content:flex-end;gap:10px;}
+
+  /* ---------- main toolbar ---------- */
+  .toolbar{
+    position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--border);
+    padding:12px 16px;
+  }
+  .toolbar-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .toolbar-title{font-size:17px;margin-right:auto;white-space:nowrap;}
+  .search-box{
+    flex:1;min-width:160px;position:relative;
+  }
+  .search-box input{
+    width:100%;padding:9px 12px 9px 32px;border:1px solid var(--border);border-radius:8px;font-size:14px;
+  }
+  .search-box::before{
+    content:"⌕";position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink-muted);font-size:15px;
+  }
+  .save-status{font-size:12.5px;color:var(--ink-muted);white-space:nowrap;}
+  .save-status.saving{color:var(--accent);}
+  .save-status.error{color:var(--drop);}
+  .stats-row{display:flex;gap:14px;flex-wrap:wrap;padding:10px 16px 0;color:var(--ink-muted);font-size:12.5px;}
+  .stats-row .pill{
+    display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;border:1px solid var(--border);
+  }
+  .stats-row .pill.keep{color:var(--keep);border-color:var(--keep-border);background:var(--keep-bg);}
+  .stats-row .pill.drop{color:var(--drop);border-color:var(--drop-border);background:var(--drop-bg);}
+
+  .filters-panel{
+    display:none;padding:12px 16px;border-bottom:1px solid var(--border);background:#FBFBF9;
+    gap:10px;flex-wrap:wrap;
+  }
+  .filters-panel.open{display:flex;}
+  .filter-field{display:flex;flex-direction:column;gap:3px;min-width:140px;}
+  .filter-field label{font-size:11.5px;color:var(--ink-muted);}
+  .filter-field select{padding:7px 8px;border:1px solid var(--border);border-radius:7px;font-size:13px;}
+  .sort-mobile{display:none;}
+
+  /* ---------- content ---------- */
+  .content{flex:1;padding:14px 16px 40px;max-width:1100px;margin:0 auto;width:100%;}
+  .empty-state{text-align:center;color:var(--ink-muted);padding:60px 20px;}
+
+  table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  thead th{
+    text-align:left;padding:10px 12px;font-size:12.5px;color:var(--ink-muted);font-weight:600;
+    border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;
+  }
+  thead th:hover{color:var(--ink);}
+  thead th .arrow{margin-left:4px;font-size:10px;}
+  tbody td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:14px;vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#FAFAF8;}
+
+  .seg-toggle{display:inline-flex;border-radius:8px;overflow:hidden;border:1px solid var(--border);}
+  .seg-toggle button{
+    border:none;background:var(--surface);padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;color:var(--ink-muted);
+    min-height:36px;
+  }
+  .seg-toggle button+button{border-left:1px solid var(--border);}
+  .seg-toggle button[data-kind="keep"].active{background:var(--keep-bg);color:var(--keep);}
+  .seg-toggle button[data-kind="drop"].active{background:var(--drop-bg);color:var(--drop);}
+  .seg-toggle button[data-kind="neutral"].active{background:#E7E9E2;color:var(--ink);}
+
+  /* mobile cards */
+  .cards{display:none;flex-direction:column;gap:10px;}
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;
+  }
+  .card .seg-toggle{width:100%;margin-bottom:10px;}
+  .card .seg-toggle button{flex:1;min-height:44px;font-size:14px;}
+  .card-title{font-weight:600;font-size:15.5px;margin-bottom:6px;}
+  .card-field{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:3px 0;border-top:1px solid #F0F0EC;}
+  .card-field:first-of-type{border-top:none;}
+  .card-field .k{color:var(--ink-muted);}
+  .card-field .v{text-align:right;}
+
+  @media (max-width:720px){
+    table{display:none;}
+    .cards{display:flex;}
+    .sort-mobile{display:flex;}
+    .toolbar-title{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- LANDING -->
+  <section class="landing" id="landing">
+    <div class="landing-card">
+      <h1>Sift</h1>
+      <p class="tag">Turn any CSV into a searchable, filterable, tap-to-decide list.</p>
+      <p class="tag hidden" id="landingError" style="color:var(--drop);"></p>
+      <label class="dropzone" id="dropzone" for="fileInput">
+        <span class="icon">↥</span>
+        <span class="main">Drop a CSV here, or tap to choose a file</span>
+        <span class="sub">Nothing leaves your browser — no upload, no server.</span>
+      </label>
+      <input type="file" id="fileInput" accept=".csv,text/csv">
+      <p class="landing-note">Works with any spreadsheet exported as CSV.</p>
+    </div>
+  </section>
+
+  <!-- COLUMN CONFIG -->
+  <section class="config hidden" id="configScreen">
+    <div class="config-head">
+      <h2>Set up your columns</h2>
+      <p>Pick which column(s) should become tap-to-choose buttons. Everything else stays as plain, searchable text.</p>
+    </div>
+    <div id="colList"></div>
+    <div class="config-actions">
+      <button class="btn ghost" id="backToUpload">Choose a different file</button>
+      <button class="btn primary" id="startBtn">Open list →</button>
+    </div>
+  </section>
+
+  <!-- MAIN VIEW -->
+  <section class="hidden" id="mainScreen" style="flex:1;display:flex;flex-direction:column;">
+    <div class="toolbar">
+      <div class="toolbar-row">
+        <h2 class="toolbar-title" id="fileNameLabel">Sift</h2>
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="Search…">
+        </div>
+        <select class="filter-field" id="sortMobile" style="display:none;"></select>
+        <span class="save-status hidden" id="saveStatus"></span>
+        <button class="btn hidden" id="shareBtn">Copy link</button>
+        <button class="btn" id="filtersToggle">Filters</button>
+        <button class="btn" id="editColumnsBtn">Columns</button>
+        <button class="btn primary" id="exportBtn">Export CSV</button>
+      </div>
+    </div>
+    <div class="filters-panel" id="filtersPanel"></div>
+    <div class="stats-row" id="statsRow"></div>
+    <div class="content">
+      <table id="dataTable">
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="bodyRows"></tbody>
+      </table>
+      <div class="cards" id="cardsView"></div>
+      <div class="empty-state hidden" id="emptyState">No rows match your search/filters.</div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- state ----------------
+  var state = {
+    fileName: "",
+    columns: [],          // [{name, type: 'text'|'segmented', options:[{label,kind}] }]
+    rows: [],             // array of plain objects, keyed by column name
+    search: "",
+    filters: {},           // colName -> selected value ("" = all)
+    sort: { col: null, dir: 1 },
+    shareToken: null       // set once this dataset has a hosted, shareable copy
+  };
+
+  var saveTimer = null;
+  var saveStatusEl = document.getElementById("saveStatus");
+  var shareBtn = document.getElementById("shareBtn");
+
+  function setSaveStatus(text, cls){
+    saveStatusEl.textContent = text;
+    saveStatusEl.className = "save-status" + (cls ? " " + cls : "");
+    saveStatusEl.classList.toggle("hidden", !text);
+  }
+
+  function scheduleSave(){
+    if (!state.shareToken) return;
+    setSaveStatus("Saving…", "saving");
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(performSave, 700);
+  }
+
+  function performSave(){
+    if (!state.shareToken) return;
+    fetch("/api/d/" + state.shareToken, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ columns: state.columns, rows: state.rows })
+    }).then(function(res){
+      if (!res.ok) throw new Error("save failed");
+      setSaveStatus("Saved", "");
+      setTimeout(function(){ if (saveStatusEl.textContent === "Saved") setSaveStatus("", ""); }, 1500);
+    }).catch(function(){
+      setSaveStatus("Couldn't save — retrying…", "error");
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(performSave, 3000);
+    });
+  }
+
+  function createHostedCopy(){
+    return fetch("/api/datasets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_name: state.fileName || "data.csv", columns: state.columns, rows: state.rows })
+    }).then(function(res){
+      if (!res.ok) throw new Error("create failed");
+      return res.json();
+    }).then(function(data){
+      state.shareToken = data.share_token;
+      history.replaceState(null, "", "/d/" + data.share_token);
+      shareBtn.classList.remove("hidden");
+    }).catch(function(){
+      // No backend reachable (or running the file locally, no server) — degrade
+      // to the fully local, export-to-save experience with no error shown.
+      shareBtn.classList.add("hidden");
+    });
+  }
+
+  shareBtn.addEventListener("click", function(){
+    var url = location.origin + "/d/" + state.shareToken;
+    if (navigator.clipboard) navigator.clipboard.writeText(url);
+    shareBtn.textContent = "Link copied";
+    setTimeout(function(){ shareBtn.textContent = "Copy link"; }, 1500);
+  });
+
+  // ---------------- helpers ----------------
+  function uniqueValues(col){
+    var set = {};
+    state.rows.forEach(function(r){
+      var v = (r[col] === undefined || r[col] === null) ? "" : String(r[col]).trim();
+      set[v] = true;
+    });
+    return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
+  }
+
+  function guessIsToggleColumn(name, values){
+    var n = name.toLowerCase();
+    if (/keep|drop|status|decision|watch|verdict/.test(n)) return true;
+    var lowSet = values.filter(function(v){ return v !== ""; }).map(function(v){return v.toLowerCase();});
+    return lowSet.length > 0 && lowSet.length <= 4;
+  }
+
+  function defaultOptionsFor(name, values){
+    var n = name.toLowerCase();
+    var nonEmpty = values.filter(function(v){ return v !== ""; });
+    if (/keep|drop/.test(n) || nonEmpty.length === 0) {
+      return [ {label:"Keep", kind:"keep"}, {label:"Drop", kind:"drop"} ];
+    }
+    // use existing distinct values, alternate kind flavoring
+    var kinds = ["keep","drop","neutral","neutral"];
+    return nonEmpty.slice(0,4).map(function(v,i){ return {label:v, kind:kinds[i] || "neutral"}; });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  // ---------------- CSV load ----------------
+  var fileInput = document.getElementById("fileInput");
+  var dropzone = document.getElementById("dropzone");
+
+  function handleFile(file){
+    if (!file) return;
+    state.fileName = file.name;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results){
+        var fields = results.meta.fields || [];
+        state.rows = results.data;
+        state.columns = fields.map(function(name){
+          var vals = uniqueValues(name);
+          var isToggle = guessIsToggleColumn(name, vals);
+          return {
+            name: name,
+            type: isToggle ? "segmented" : "text",
+            options: isToggle ? defaultOptionsFor(name, vals) : []
+          };
+        });
+        showConfigScreen();
+      },
+      error: function(err){
+        alert("Couldn't read that file as CSV: " + err.message);
+      }
+    });
+  }
+
+  fileInput.addEventListener("change", function(e){ handleFile(e.target.files[0]); });
+  dropzone.addEventListener("dragover", function(e){ e.preventDefault(); dropzone.classList.add("drag"); });
+  dropzone.addEventListener("dragleave", function(){ dropzone.classList.remove("drag"); });
+  dropzone.addEventListener("drop", function(e){
+    e.preventDefault(); dropzone.classList.remove("drag");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+
+  // ---------------- config screen ----------------
+  var landing = document.getElementById("landing");
+  var configScreen = document.getElementById("configScreen");
+  var mainScreen = document.getElementById("mainScreen");
+  var colList = document.getElementById("colList");
+
+  function showConfigScreen(){
+    landing.classList.add("hidden");
+    mainScreen.classList.add("hidden");
+    configScreen.classList.remove("hidden");
+    renderColumnConfig();
+  }
+
+  function renderColumnConfig(){
+    colList.innerHTML = "";
+    state.columns.forEach(function(col, idx){
+      var sample = state.rows.slice(0,3).map(function(r){ return r[col.name]; })
+        .filter(function(v){ return v !== undefined && v !== ""; }).join(" · ");
+      var row = document.createElement("div");
+      row.className = "col-row";
+      row.innerHTML =
+        '<div class="col-row-top">' +
+          '<div><div class="col-name">' + escapeHtml(col.name) + '</div>' +
+          '<div class="col-sample">' + (sample ? escapeHtml(sample) : "&nbsp;") + '</div></div>' +
+          '<div class="seg-select" data-idx="'+idx+'">' +
+            '<button data-type="text" class="'+(col.type==="text"?"active":"")+'">Text</button>' +
+            '<button data-type="segmented" class="'+(col.type==="segmented"?"active":"")+'">Choice buttons</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="col-options" style="'+(col.type==="segmented"?"":"display:none;")+'">' +
+          '<label>Options (comma separated)</label>' +
+          '<input type="text" data-opts-idx="'+idx+'" value="'+ escapeHtml(col.options.map(function(o){return o.label;}).join(", ")) +'">' +
+        '</div>';
+      colList.appendChild(row);
+    });
+
+    colList.querySelectorAll(".seg-select button").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var idx = parseInt(btn.parentElement.getAttribute("data-idx"), 10);
+        var type = btn.getAttribute("data-type");
+        state.columns[idx].type = type;
+        if (type === "segmented" && state.columns[idx].options.length === 0){
+          state.columns[idx].options = defaultOptionsFor(state.columns[idx].name, uniqueValues(state.columns[idx].name));
+        }
+        renderColumnConfig();
+      });
+    });
+    colList.querySelectorAll("[data-opts-idx]").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var idx = parseInt(inp.getAttribute("data-opts-idx"), 10);
+        var labels = inp.value.split(",").map(function(s){ return s.trim(); }).filter(Boolean);
+        var kinds = ["keep","drop","neutral","neutral","neutral"];
+        state.columns[idx].options = labels.map(function(l,i){ return {label:l, kind:kinds[i]||"neutral"}; });
+      });
+    });
+  }
+
+  document.getElementById("backToUpload").addEventListener("click", function(){
+    configScreen.classList.add("hidden");
+    landing.classList.remove("hidden");
+    fileInput.value = "";
+  });
+
+  document.getElementById("startBtn").addEventListener("click", function(){
+    state.filters = {};
+    state.columns.forEach(function(c){ state.filters[c.name] = ""; });
+    configScreen.classList.add("hidden");
+    mainScreen.classList.remove("hidden");
+    document.getElementById("fileNameLabel").textContent = state.fileName || "Sift";
+    buildToolbar();
+    render();
+    if (state.shareToken) scheduleSave();       // column config changed on an already-shared dataset
+    else createHostedCopy();                     // first time — try to get a shareable link
+  });
+
+  document.getElementById("editColumnsBtn").addEventListener("click", function(){
+    mainScreen.classList.add("hidden");
+    showConfigScreen();
+  });
+
+  // ---------------- toolbar (filters + sort + headers) ----------------
+  var searchInput = document.getElementById("searchInput");
+  var filtersPanel = document.getElementById("filtersPanel");
+  var filtersToggle = document.getElementById("filtersToggle");
+  var sortMobile = document.getElementById("sortMobile");
+  var headRow = document.getElementById("headRow");
+
+  searchInput.addEventListener("input", function(){
+    state.search = searchInput.value.trim().toLowerCase();
+    render();
+  });
+
+  filtersToggle.addEventListener("click", function(){
+    filtersPanel.classList.toggle("open");
+  });
+
+  function buildToolbar(){
+    // filters panel
+    filtersPanel.innerHTML = "";
+    state.columns.forEach(function(col){
+      var values = col.type === "segmented"
+        ? col.options.map(function(o){ return o.label; }).concat(["(undecided)"])
+        : uniqueValues(col.name);
+      var field = document.createElement("div");
+      field.className = "filter-field";
+      var opts = '<option value="">All</option>' + values.map(function(v){
+        return '<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>';
+      }).join("");
+      field.innerHTML = '<label>'+escapeHtml(col.name)+'</label><select data-col="'+escapeHtml(col.name)+'">'+opts+'</select>';
+      filtersPanel.appendChild(field);
+    });
+    filtersPanel.querySelectorAll("select").forEach(function(sel){
+      sel.addEventListener("change", function(){
+        state.filters[sel.getAttribute("data-col")] = sel.value;
+        render();
+      });
+    });
+
+    // mobile sort dropdown
+    sortMobile.innerHTML = state.columns.map(function(c){
+      return '<option value="'+escapeHtml(c.name)+'">Sort: '+escapeHtml(c.name)+'</option>';
+    }).join("");
+    sortMobile.style.display = "";
+    sortMobile.addEventListener("change", function(){
+      state.sort = { col: sortMobile.value, dir: 1 };
+      render();
+    });
+
+    // table headers
+    headRow.innerHTML = state.columns.map(function(c){
+      return '<th data-col="'+escapeHtml(c.name)+'">'+escapeHtml(c.name)+'<span class="arrow"></span></th>';
+    }).join("");
+    headRow.querySelectorAll("th").forEach(function(th){
+      th.addEventListener("click", function(){
+        var col = th.getAttribute("data-col");
+        if (state.sort.col === col) state.sort.dir *= -1;
+        else state.sort = { col: col, dir: 1 };
+        render();
+      });
+    });
+  }
+
+  // ---------------- filtering / sorting ----------------
+  function getFiltered(){
+    var rows = state.rows.filter(function(r){
+      if (state.search){
+        var hit = state.columns.some(function(c){
+          var v = r[c.name];
+          return v !== undefined && String(v).toLowerCase().indexOf(state.search) !== -1;
+        });
+        if (!hit) return false;
+      }
+      for (var colName in state.filters){
+        var want = state.filters[colName];
+        if (!want) continue;
+        var actual = (r[colName] === undefined || r[colName] === null) ? "" : String(r[colName]).trim();
+        if (want === "(undecided)"){
+          if (actual !== "") return false;
+        } else if (actual !== want) return false;
+      }
+      return true;
+    });
+
+    if (state.sort.col){
+      var col = state.sort.col, dir = state.sort.dir;
+      rows = rows.slice().sort(function(a,b){
+        var av = (a[col] === undefined) ? "" : String(a[col]);
+        var bv = (b[col] === undefined) ? "" : String(b[col]);
+        var an = parseFloat(av), bn = parseFloat(bv);
+        var cmp;
+        if (!isNaN(an) && !isNaN(bn) && av.trim() !== "" && bv.trim() !== "") cmp = an - bn;
+        else cmp = av.localeCompare(bv);
+        return cmp * dir;
+      });
+    }
+    return rows;
+  }
+
+  // ---------------- rendering rows ----------------
+  var bodyRows = document.getElementById("bodyRows");
+  var cardsView = document.getElementById("cardsView");
+  var emptyState = document.getElementById("emptyState");
+  var statsRow = document.getElementById("statsRow");
+  var dataTable = document.getElementById("dataTable");
+
+  function segToggleHtml(rowIdx, col){
+    var current = state.rows[rowIdx][col.name] || "";
+    var buttons = col.options.map(function(o){
+      var active = current === o.label;
+      return '<button data-kind="'+o.kind+'" data-row="'+rowIdx+'" data-col="'+escapeHtml(col.name)+'" data-label="'+escapeHtml(o.label)+'" class="'+(active?"active":"")+'">'+escapeHtml(o.label)+'</button>';
+    }).join("");
+    return '<div class="seg-toggle">'+buttons+'</div>';
+  }
+
+  function attachToggleHandlers(container){
+    container.querySelectorAll(".seg-toggle button").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var rowIdx = parseInt(btn.getAttribute("data-row"), 10);
+        var colName = btn.getAttribute("data-col");
+        var label = btn.getAttribute("data-label");
+        var isActive = btn.classList.contains("active");
+        state.rows[rowIdx][colName] = isActive ? "" : label; // tap again to clear
+        render();
+        scheduleSave();
+      });
+    });
+  }
+
+  function render(){
+    var filtered = getFiltered();
+    emptyState.classList.toggle("hidden", filtered.length !== 0);
+    dataTable.style.display = filtered.length ? "" : "none";
+
+    // find real index in state.rows for each filtered row so toggles mutate the right object
+    var indexed = filtered.map(function(r){ return { row:r, idx: state.rows.indexOf(r) }; });
+
+    // ---- table (desktop) ----
+    bodyRows.innerHTML = indexed.map(function(item){
+      var cells = state.columns.map(function(c){
+        if (c.type === "segmented") return '<td>'+segToggleHtml(item.idx, c)+'</td>';
+        var v = item.row[c.name];
+        return '<td>'+escapeHtml(v === undefined ? "" : v)+'</td>';
+      }).join("");
+      return '<tr>'+cells+'</tr>';
+    }).join("");
+    attachToggleHandlers(bodyRows);
+
+    // update sort arrows
+    headRow.querySelectorAll("th").forEach(function(th){
+      var arrow = th.querySelector(".arrow");
+      if (th.getAttribute("data-col") === state.sort.col) arrow.textContent = state.sort.dir === 1 ? "▲" : "▼";
+      else arrow.textContent = "";
+    });
+
+    // ---- cards (mobile) ----
+    var titleCol = state.columns[0] ? state.columns[0].name : null;
+    var toggleCols = state.columns.filter(function(c){ return c.type === "segmented"; });
+    var textCols = state.columns.filter(function(c){ return c.type === "text"; });
+
+    cardsView.innerHTML = indexed.map(function(item){
+      var toggles = toggleCols.map(function(c){ return segToggleHtml(item.idx, c); }).join("");
+      var title = titleCol ? escapeHtml(item.row[titleCol] || "") : "";
+      var fields = textCols.filter(function(c){ return c.name !== titleCol; }).map(function(c){
+        var v = item.row[c.name];
+        if (v === undefined || v === "") return "";
+        return '<div class="card-field"><span class="k">'+escapeHtml(c.name)+'</span><span class="v">'+escapeHtml(v)+'</span></div>';
+      }).join("");
+      return '<div class="card">'+toggles+(title ? '<div class="card-title">'+title+'</div>' : '')+fields+'</div>';
+    }).join("");
+    attachToggleHandlers(cardsView);
+
+    // ---- stats ----
+    var statsHtml = '<span>'+filtered.length+' of '+state.rows.length+' rows</span>';
+    toggleCols.forEach(function(c){
+      c.options.forEach(function(o){
+        var count = state.rows.filter(function(r){ return r[c.name] === o.label; }).length;
+        statsHtml += '<span class="pill '+(o.kind==="keep"?"keep":o.kind==="drop"?"drop":"")+'">'+escapeHtml(o.label)+': '+count+'</span>';
+      });
+      var undecided = state.rows.filter(function(r){ return !r[c.name]; }).length;
+      statsHtml += '<span class="pill">Undecided: '+undecided+'</span>';
+    });
+    statsRow.innerHTML = statsHtml;
+  }
+
+  // ---------------- export ----------------
+  document.getElementById("exportBtn").addEventListener("click", function(){
+    var fields = state.columns.map(function(c){ return c.name; });
+    var csv = Papa.unparse({ fields: fields, data: state.rows.map(function(r){
+      return fields.map(function(f){ return r[f] === undefined ? "" : r[f]; });
+    }) });
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var base = (state.fileName || "data.csv").replace(/\.csv$/i, "");
+    a.href = url;
+    a.download = base + "-sifted.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  // ---------------- bootstrap: is this a shared link? ----------------
+  (function bootstrap(){
+    var m = location.pathname.match(/^\/d\/([A-Za-z0-9_-]+)\/?$/);
+    if (!m) return; // plain landing page — normal upload flow applies
+    var token = m[1];
+    fetch("/api/d/" + token).then(function(res){
+      if (!res.ok) throw new Error("not found");
+      return res.json();
+    }).then(function(data){
+      state.fileName = data.file_name;
+      state.columns = data.columns;
+      state.rows = data.rows;
+      state.shareToken = token;
+      state.filters = {};
+      state.columns.forEach(function(c){ state.filters[c.name] = ""; });
+      landing.classList.add("hidden");
+      mainScreen.classList.remove("hidden");
+      document.getElementById("fileNameLabel").textContent = state.fileName || "Sift";
+      shareBtn.classList.remove("hidden");
+      buildToolbar();
+      render();
+    }).catch(function(){
+      var err = document.getElementById("landingError");
+      err.textContent = "That link doesn't exist (or was removed). Upload a CSV to start a new one.";
+      err.classList.remove("hidden");
+      history.replaceState(null, "", "/");
+    });
+  })();
+
+})();
+</script>
+</body>
+</html>
