@@ -114,6 +114,11 @@ git tag v1.2.3
 git push origin v1.2.3
 ```
 
+## License
+
+Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at
+your option — the same convention most of the Rust ecosystem uses.
+
 ## A build note from development
 
 This was scaffolded and code-reviewed in a sandbox pinned to Rust 1.75
