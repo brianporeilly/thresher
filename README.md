@@ -81,6 +81,39 @@ docker build -t thresher .
 docker run -p 8080:8080 -v $(pwd)/data:/data thresher
 ```
 
+The runtime image runs as the distroless `nonroot` user (uid/gid `65532`),
+so whatever you mount at `/data` — a bind mount, a PVC, a named volume —
+needs to be writable by that uid. For a plain bind mount:
+
+```
+mkdir -p data && chown 65532:65532 data
+```
+
+## Pulling a release image
+
+Tagged releases are published to GHCR as multi-arch images (`linux/amd64`
+and `linux/arm64`):
+
+```
+docker pull ghcr.io/brianporeilly/thresher:latest
+# or pin to a version:
+docker pull ghcr.io/brianporeilly/thresher:v1.2.3
+docker pull ghcr.io/brianporeilly/thresher:1.2
+docker pull ghcr.io/brianporeilly/thresher:1
+```
+
+## Cutting a release
+
+Push a semver tag (`vX.Y.Z`) — everything else is automated by
+`.github/workflows/release.yml`: it builds and attaches Linux binaries
+(amd64 + arm64) to a GitHub Release with auto-generated notes, and builds
+and pushes the multi-arch GHCR image with the tags above.
+
+```
+git tag v1.2.3
+git push origin v1.2.3
+```
+
 ## A build note from development
 
 This was scaffolded and code-reviewed in a sandbox pinned to Rust 1.75
