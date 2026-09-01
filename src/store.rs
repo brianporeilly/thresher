@@ -48,7 +48,8 @@ impl Store {
             let store = Store::Sqlite(pool);
             store.init_schema().await?;
             Ok(store)
-        } else if database_url.starts_with("postgres://") || database_url.starts_with("postgresql://")
+        } else if database_url.starts_with("postgres://")
+            || database_url.starts_with("postgresql://")
         {
             let pool = PgPoolOptions::new()
                 .max_connections(10)
@@ -68,12 +69,20 @@ impl Store {
     async fn init_schema(&self) -> Result<()> {
         match self {
             Store::Sqlite(pool) => {
-                for stmt in SCHEMA_SQL.split(';').map(str::trim).filter(|s| !s.is_empty()) {
+                for stmt in SCHEMA_SQL
+                    .split(';')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                {
                     sqlx::query(stmt).execute(pool).await?;
                 }
             }
             Store::Postgres(pool) => {
-                for stmt in SCHEMA_SQL.split(';').map(str::trim).filter(|s| !s.is_empty()) {
+                for stmt in SCHEMA_SQL
+                    .split(';')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                {
                     sqlx::query(stmt).execute(pool).await?;
                 }
             }

@@ -6,7 +6,9 @@ use axum::{
 };
 use std::sync::Arc;
 
-use crate::models::{CreateDatasetRequest, CreateDatasetResponse, DatasetResponse, UpdateDatasetRequest};
+use crate::models::{
+    CreateDatasetRequest, CreateDatasetResponse, DatasetResponse, UpdateDatasetRequest,
+};
 use crate::store::Store;
 
 pub struct AppError {
@@ -16,7 +18,10 @@ pub struct AppError {
 
 impl AppError {
     fn not_found(msg: &str) -> Self {
-        Self { status: StatusCode::NOT_FOUND, message: msg.to_string() }
+        Self {
+            status: StatusCode::NOT_FOUND,
+            message: msg.to_string(),
+        }
     }
 }
 
@@ -31,7 +36,10 @@ impl IntoResponse for AppError {
 
 impl From<anyhow::Error> for AppError {
     fn from(e: anyhow::Error) -> Self {
-        Self { status: StatusCode::INTERNAL_SERVER_ERROR, message: format!("internal error: {e}") }
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            message: format!("internal error: {e}"),
+        }
     }
 }
 
@@ -42,7 +50,10 @@ pub async fn create_dataset(
     let ds = store
         .create_dataset(&payload.file_name, &payload.columns, &payload.rows)
         .await?;
-    Ok(Json(CreateDatasetResponse { id: ds.id, share_token: ds.share_token }))
+    Ok(Json(CreateDatasetResponse {
+        id: ds.id,
+        share_token: ds.share_token,
+    }))
 }
 
 pub async fn get_dataset(
@@ -83,7 +94,11 @@ pub async fn export_csv(
         .cloned()
         .unwrap_or_default()
         .iter()
-        .filter_map(|c| c.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()))
+        .filter_map(|c| {
+            c.get("name")
+                .and_then(|n| n.as_str())
+                .map(|s| s.to_string())
+        })
         .collect();
 
     let rows = ds.rows.as_array().cloned().unwrap_or_default();
