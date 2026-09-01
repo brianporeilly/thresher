@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Sift — CSV triage tool</title>
+<title>Thresher — CSV triage tool</title>
 <script src="/papaparse.min.js"></script>
 <style>
   :root{
@@ -199,7 +199,7 @@
   <!-- LANDING -->
   <section class="landing" id="landing">
     <div class="landing-card">
-      <h1>Sift</h1>
+      <h1>Thresher</h1>
       <p class="tag">Turn any CSV into a searchable, filterable, tap-to-decide list.</p>
       <p class="tag hidden" id="landingError" style="color:var(--drop);"></p>
       <label class="dropzone" id="dropzone" for="fileInput">
@@ -229,7 +229,7 @@
   <section class="hidden" id="mainScreen" style="flex:1;display:flex;flex-direction:column;">
     <div class="toolbar">
       <div class="toolbar-row">
-        <h2 class="toolbar-title" id="fileNameLabel">Sift</h2>
+        <h2 class="toolbar-title" id="fileNameLabel">Thresher</h2>
         <div class="search-box">
           <input type="text" id="searchInput" placeholder="Search…">
         </div>
@@ -470,7 +470,7 @@
     state.columns.forEach(function(c){ state.filters[c.name] = ""; });
     configScreen.classList.add("hidden");
     mainScreen.classList.remove("hidden");
-    document.getElementById("fileNameLabel").textContent = state.fileName || "Sift";
+    document.getElementById("fileNameLabel").textContent = state.fileName || "Thresher";
     buildToolbar();
     render();
     if (state.shareToken) scheduleSave();       // column config changed on an already-shared dataset
@@ -677,7 +677,7 @@
     var a = document.createElement("a");
     var base = (state.fileName || "data.csv").replace(/\.csv$/i, "");
     a.href = url;
-    a.download = base + "-sifted.csv";
+    a.download = base + "-threshed.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -701,7 +701,7 @@
       state.columns.forEach(function(c){ state.filters[c.name] = ""; });
       landing.classList.add("hidden");
       mainScreen.classList.remove("hidden");
-      document.getElementById("fileNameLabel").textContent = state.fileName || "Sift";
+      document.getElementById("fileNameLabel").textContent = state.fileName || "Thresher";
       shareBtn.classList.remove("hidden");
       buildToolbar();
       render();

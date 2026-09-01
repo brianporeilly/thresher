@@ -1,7 +1,7 @@
-# Sift server
+# Thresher
 
-A tiny self-hosted backend for the Sift CSV-triage tool. Single Rust binary,
-embeds the frontend, talks to SQLite (default) or Postgres.
+A tiny self-hosted CSV-triage tool. Single Rust binary, embeds the frontend,
+talks to SQLite (default) or Postgres.
 
 ## Layout
 
@@ -24,12 +24,12 @@ Dockerfile          multi-stage musl build -> distroless/static image
 
 | Var            | Default                   | Notes                                             |
 |----------------|---------------------------|----------------------------------------------------|
-| `DATABASE_URL` | `sqlite://data/sift.db`   | `sqlite://path/to/file.db` or `postgres://user:pass@host/db` |
+| `DATABASE_URL` | `sqlite://data/thresher.db` | `sqlite://path/to/file.db` or `postgres://user:pass@host/db` |
 | `PORT`         | `8080`                    | HTTP listen port                                   |
-| `RUST_LOG`     | `sift_server=info,tower_http=info` | standard `tracing_subscriber` env filter  |
+| `RUST_LOG`     | `thresher=info,tower_http=info` | standard `tracing_subscriber` env filter  |
 
 The SQLite path's parent directory is created automatically if missing, so
-`DATABASE_URL=sqlite://data/sift.db` just works with a mounted volume at
+`DATABASE_URL=sqlite://data/thresher.db` just works with a mounted volume at
 `./data` (or a k8s PVC at that path).
 
 ## Running locally
@@ -42,7 +42,7 @@ cargo run
 Against Postgres instead:
 
 ```
-DATABASE_URL=postgres://user:pass@localhost:5432/sift cargo run
+DATABASE_URL=postgres://user:pass@localhost:5432/thresher cargo run
 ```
 
 No migrations step needed — the one table is created with
@@ -77,8 +77,8 @@ row at the exact same moment will have one edit clobber the other.
 ## Building the image
 
 ```
-docker build -t sift-server .
-docker run -p 8080:8080 -v $(pwd)/data:/data sift-server
+docker build -t thresher .
+docker run -p 8080:8080 -v $(pwd)/data:/data thresher
 ```
 
 ## A build note from development

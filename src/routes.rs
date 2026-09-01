@@ -107,7 +107,7 @@ pub async fn export_csv(
         .into_inner()
         .map_err(|e| anyhow::anyhow!("finalizing csv: {e}"))?;
 
-    let filename = format!("{}-sifted.csv", ds.file_name.trim_end_matches(".csv"));
+    let filename = format!("{}-threshed.csv", ds.file_name.trim_end_matches(".csv"));
     let disposition = format!("attachment; filename=\"{filename}\"");
 
     Ok((

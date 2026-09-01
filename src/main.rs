@@ -17,12 +17,12 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "sift_server=info,tower_http=info".into()),
+                .unwrap_or_else(|_| "thresher=info,tower_http=info".into()),
         )
         .init();
 
     let database_url =
-        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://data/sift.db".to_string());
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://data/thresher.db".to_string());
     let port: u16 = std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())

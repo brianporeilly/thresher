@@ -28,12 +28,12 @@ RUN touch src/main.rs \
 # and nothing else — a good match for a fully static musl binary.
 FROM gcr.io/distroless/static-debian12
 
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/sift-server /sift-server
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/thresher /thresher
 
-ENV DATABASE_URL=sqlite:///data/sift.db
+ENV DATABASE_URL=sqlite:///data/thresher.db
 ENV PORT=8080
 
 EXPOSE 8080
 VOLUME ["/data"]
 
-ENTRYPOINT ["/sift-server"]
+ENTRYPOINT ["/thresher"]
