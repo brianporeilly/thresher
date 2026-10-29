@@ -1,3 +1,10 @@
+//! Persistence: one `datasets` table on either SQLite or Postgres.
+//!
+//! Columns and rows are stored as JSON text blobs, so the schema never has
+//! to change when the frontend's data model does. The DDL below is
+//! portable between both backends and is applied on every startup with
+//! `IF NOT EXISTS`; there is no separate migration step.
+
 use anyhow::{Context, Result};
 use chrono::Utc;
 use sqlx::{postgres::PgPoolOptions, sqlite::SqliteConnectOptions, PgPool, SqlitePool};
@@ -31,6 +38,13 @@ pub enum Store {
 }
 
 impl Store {
+    /// Connect to the database named by `database_url` and ensure the
+    /// schema exists.
+    ///
+    /// `sqlite://<path>` creates the parent directory and the database file
+    /// if needed; a relative path is resolved against the working directory.
+    /// `postgres://` or `postgresql://` opens a pool of up to 10
+    /// connections. Any other scheme is an error.
     pub async fn connect(database_url: &str) -> Result<Self> {
         if let Some(path) = database_url.strip_prefix("sqlite://") {
             if let Some(parent) = Path::new(path).parent() {
@@ -66,6 +80,9 @@ impl Store {
         }
     }
 
+    /// Run each statement in `SCHEMA_SQL`. Statements are executed one at a
+    /// time because a single prepared query can't contain several
+    /// statements.
     async fn init_schema(&self) -> Result<()> {
         match self {
             Store::Sqlite(pool) => {
@@ -90,6 +107,8 @@ impl Store {
         Ok(())
     }
 
+    /// Insert a new dataset with a fresh UUID `id` and a random 12-character
+    /// nanoid `share_token`. Both timestamps are set to now.
     pub async fn create_dataset(
         &self,
         file_name: &str,
@@ -146,6 +165,7 @@ impl Store {
         })
     }
 
+    /// Look up a dataset by share token. `Ok(None)` means no such token.
     pub async fn get_by_token(&self, token: &str) -> Result<Option<Dataset>> {
         let row: Option<(String, String, String, String, String, String, String)> = match self {
             Store::Sqlite(pool) => sqlx::query_as(
@@ -180,6 +200,9 @@ impl Store {
         }
     }
 
+    /// Overwrite `columns` and `rows` for the given token and set
+    /// `updated_at` to now. Returns the updated dataset, or `Ok(None)` if
+    /// the token doesn't exist.
     pub async fn update_by_token(
         &self,
         token: &str,

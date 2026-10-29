@@ -1,9 +1,17 @@
+//! The frontend, compiled into the binary.
+//!
+//! Everything under `static/` is embedded at build time by `rust-embed`
+//! (in debug builds it is read from disk instead, so edits to
+//! `static/index.html` show up without recompiling). Changing the
+//! frontend for a release build therefore requires a rebuild.
+
 use axum::{
     http::{header, StatusCode, Uri},
     response::IntoResponse,
 };
 use rust_embed::RustEmbed;
 
+/// Files embedded from `static/`.
 #[derive(RustEmbed)]
 #[folder = "static/"]
 struct Assets;

@@ -1,3 +1,5 @@
+//! HTTP handlers for the `/api` routes. Wiring lives in `main.rs`.
+
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -11,6 +13,12 @@ use crate::models::{
 };
 use crate::store::Store;
 
+/// Error type returned by every handler.
+///
+/// Rendered as a plain-text body with the given status. Any
+/// `anyhow::Error` (database failures, bad stored JSON, CSV writer errors)
+/// becomes a 500 and is logged; note the error text is also sent to the
+/// client.
 pub struct AppError {
     status: StatusCode,
     message: String,
@@ -43,6 +51,7 @@ impl From<anyhow::Error> for AppError {
     }
 }
 
+/// `POST /api/datasets`: store a new dataset and mint its share token.
 pub async fn create_dataset(
     State(store): State<Arc<Store>>,
     Json(payload): Json<CreateDatasetRequest>,
@@ -56,6 +65,7 @@ pub async fn create_dataset(
     }))
 }
 
+/// `GET /api/d/:token`: fetch a dataset, or 404 if the token is unknown.
 pub async fn get_dataset(
     State(store): State<Arc<Store>>,
     Path(token): Path<String>,
@@ -67,6 +77,10 @@ pub async fn get_dataset(
     Ok(Json(ds.into()))
 }
 
+/// `PUT /api/d/:token`: replace `columns` and `rows` and bump `updated_at`.
+///
+/// Whole-document, last-write-wins: there is no version check, so a stale
+/// client silently overwrites newer edits.
 pub async fn update_dataset(
     State(store): State<Arc<Store>>,
     Path(token): Path<String>,
@@ -79,6 +93,14 @@ pub async fn update_dataset(
     Ok(Json(ds.into()))
 }
 
+/// `GET /api/d/:token/export.csv`: render the stored dataset as a CSV file.
+///
+/// The header row is the `name` of each entry in `columns`, in order;
+/// columns without a string `name` are skipped. Each row is looked up by
+/// those names: strings are written as-is, null or missing values as empty
+/// cells, and any other JSON value (number, bool, object) as its JSON text.
+/// The download is named `<file_name without .csv>-threshed.csv`, matching
+/// the frontend's own client-side export.
 pub async fn export_csv(
     State(store): State<Arc<Store>>,
     Path(token): Path<String>,

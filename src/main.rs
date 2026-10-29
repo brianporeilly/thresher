@@ -1,3 +1,16 @@
+//! Thresher: a small self-hosted CSV-triage server.
+//!
+//! One binary that serves the embedded single-page frontend (`static/`) and
+//! a tiny JSON API for storing and sharing datasets. Storage is SQLite by
+//! default or Postgres, chosen by the scheme of `DATABASE_URL`.
+//!
+//! Configuration is read from the environment at startup:
+//! `DATABASE_URL` (default `sqlite://data/thresher.db`), `PORT` (default
+//! `8080`) and `RUST_LOG` (default `thresher=info,tower_http=info`).
+//!
+//! See `docs/architecture.md` and `docs/api.md` in the repository for the
+//! full picture.
+
 mod models;
 mod routes;
 mod static_files;
@@ -37,6 +50,7 @@ async fn main() -> anyhow::Result<()> {
         "connected to store"
     );
 
+    // JSON API, mounted under /api. Every handler shares the one Store.
     let api = Router::new()
         .route("/datasets", post(routes::create_dataset))
         .route(
@@ -46,6 +60,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/d/:token/export.csv", get(routes::export_csv))
         .with_state(store);
 
+    // Anything that isn't /healthz or /api/* falls through to the embedded
+    // frontend, which handles client-side routes such as /d/<token>.
     let app = Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .nest("/api", api)
@@ -65,6 +81,11 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Resolves when the process receives Ctrl+C (SIGINT) or, on Unix, SIGTERM.
+///
+/// Passed to `axum::serve(..).with_graceful_shutdown(..)` so in-flight
+/// requests are allowed to finish before the process exits, which is what
+/// Kubernetes and `docker stop` expect.
 async fn shutdown_signal() {
     let ctrl_c = async {
         tokio::signal::ctrl_c()
