@@ -3,6 +3,14 @@
 A tiny self-hosted CSV-triage tool. Single Rust binary, embeds the frontend,
 talks to SQLite (default) or Postgres.
 
+## Documentation
+
+- [docs/architecture.md](docs/architecture.md): how the pieces fit together,
+  storage schema, and how the frontend talks to the server
+- [docs/api.md](docs/api.md): full HTTP API reference, including the
+  `columns`/`rows` data shape, status codes, and limits
+- [CONTRIBUTING.md](CONTRIBUTING.md): local dev loop and the checks CI runs
+
 ## Layout
 
 ```
@@ -11,7 +19,7 @@ src/
   store.rs         Store enum over SqlitePool / PgPool — one table, JSON blobs
   routes.rs        POST /api/datasets, GET/PUT /api/d/:token, GET .../export.csv
   static_files.rs  serves the embedded frontend, SPA-style fallback to index.html
-models.rs          request/response shapes
+  models.rs        request/response shapes
 static/
   index.html       the frontend (same file that works standalone, extended
                     with hosted-mode: loads /d/:token from the API, autosaves
@@ -98,8 +106,8 @@ and `linux/arm64`):
 docker pull ghcr.io/brianporeilly/thresher:latest
 # or pin to a version:
 docker pull ghcr.io/brianporeilly/thresher:v1.2.3
-docker pull ghcr.io/brianporeilly/thresher:1.2
-docker pull ghcr.io/brianporeilly/thresher:1
+docker pull ghcr.io/brianporeilly/thresher:v1.2
+docker pull ghcr.io/brianporeilly/thresher:v1
 ```
 
 ## Cutting a release
